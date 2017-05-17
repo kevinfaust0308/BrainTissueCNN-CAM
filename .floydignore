@@ -1,0 +1,8 @@
+
+# Directories to ignore when uploading code to floyd
+# Do not add a trailing slash for directories
+
+brAin-1.jpg
+*.h5
+/data/all
+/data/subset_100
