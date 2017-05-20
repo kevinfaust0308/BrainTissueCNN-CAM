@@ -8,10 +8,6 @@ __pycache__/
 
 # Distribution / packaging
 
-data/all
-data/subset_1000
-brAin-1.jpg
-
 
 .Python
 env/
