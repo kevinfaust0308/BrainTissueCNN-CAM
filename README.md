@@ -6,7 +6,6 @@ Works well with medical imaging or other images where spacial structure is not-i
 
 Please note, multi-layered CAM currently works with **at most 7 classes**
 
-
 ## Getting Started
 
 Within CAM_custom_large_image.py, please read docstring of:
@@ -29,11 +28,11 @@ OpenCV for CAM overlay on image
 
 ### Results
 
-#### Single Layer
+#### Single Layer (shows areas that contain gray matter brain tissue
 
 ![Alt text](multi_tiled_tissue_SINGLE_LAYER_NO_BLANK_CAM.jpg?raw=true "Single CAM Overlay")
 
-#### Multi Layer
+#### Multi Layer (shows areas of multiple classes)
 
 ![Alt text](multi_tiled_tissue_NO_BLANK_CAM.jpg?raw=true "Multi CAM Overlay")
 
