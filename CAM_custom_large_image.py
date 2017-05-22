@@ -644,10 +644,11 @@ def get_multi_stacked_cam(model, image, classes, conv_name, overlay_alpha=0.3, t
 
 
 
-def overlay_cam_large_image(model, cnn_trained_image_size, image, conv_name, class_idx, overlay_alpha=0.5,
+def overlay_cam_large_image(model, cnn_trained_image_size, classes, image, conv_name, class_idx, overlay_alpha=0.5,
                            cmap=None):
     ''' 
-    Takes in a larger image in multiples of the image sizes trained on the CNN and returns a CAM overlay
+    Takes in a larger image in multiples of the image sizes trained on the CNN and returns a CAM overlay. Returns average 
+    prediction of all sub-images
     
     Class activation map is an unsupervised way of doing object localization with accuracy near par with supervised methods
     
@@ -658,6 +659,8 @@ def overlay_cam_large_image(model, cnn_trained_image_size, image, conv_name, cla
         
     cnn_trained_image_size: str
         Image size trained on the CNN
+        
+    classes: list of str
 
     image : ndarray
         Matrix representation. Must have dimensions that are multiples of 'cnn_trained_image_size'
@@ -677,6 +680,7 @@ def overlay_cam_large_image(model, cnn_trained_image_size, image, conv_name, cla
     Returns
     --------
     new_image : array_like
+    my_dict : dict
     '''
      
     # shape of image
@@ -684,6 +688,10 @@ def overlay_cam_large_image(model, cnn_trained_image_size, image, conv_name, cla
     
     # new image placeholder
     new_image = np.zeros((height+1, width+1, chn))
+    
+    # we will keep track of the average prediction
+    avg_pred = np.asarray([0.0] * len(classes))
+    counter = 0
     
     # this is a slow process so add progress bar
     print('Analyzing', end='')
@@ -696,7 +704,12 @@ def overlay_cam_large_image(model, cnn_trained_image_size, image, conv_name, cla
             sub_img = image[j:j+cnn_trained_image_size,i:i+cnn_trained_image_size,:]
             
             # get cam of desired class
-            overlay_cam, _ = get_cam(model, sub_img, conv_name, class_idx, overlay=True, overlay_alpha=overlay_alpha, cmap=cmap)
+            overlay_cam, pred = get_cam(model, sub_img, conv_name, class_idx, overlay=True, overlay_alpha=overlay_alpha, cmap=cmap)
+            
+            # add pred to total
+            avg_pred += pred
+            # add counter in order to divide avg_pred at end to get average
+            counter += 1
             
             # put sub-image into correct spot of matrix (recreating image)
             new_image[j:j+cnn_trained_image_size,i:i+cnn_trained_image_size,:] = overlay_cam
@@ -706,17 +719,27 @@ def overlay_cam_large_image(model, cnn_trained_image_size, image, conv_name, cla
             
     # progress bar
     print('Complete')
+   
+    # calculate average pred
+    avg_pred = avg_pred / counter
+    
+    my_dict = {}
+    for i in range(len(classes)):
+        my_dict[classes[i]] = avg_pred[i]
            
-    # return recreated image    
-    return new_image.astype(np.uint8) 
+    # return recreated image and average predictions
+    return new_image.astype(np.uint8), my_dict
 
 
 
 
-def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes, image, conv_name, overlay_alpha=0.5, overlay_text_color=(0,0,0)):
+def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes, image, conv_name, overlay_alpha=0.5, overlay_predictions=False, overlay_text_color=(0,0,0)):
     ''' 
     Takes in a larger image in multiples of the image sizes trained on the CNN and returns a multi CAM overlay. Each
     overlay on each subimage will have only its top 3 predicted classes shown.
+    
+    Returns total average prediction if 'overlay_predictions' is False. Otherwise, shows individual sub-image predictions
+    as overlay
     
     Class activation map is an unsupervised way of doing object localization with accuracy near par with supervised methods
     
@@ -727,6 +750,8 @@ def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes
         
     cnn_trained_image_size: str
         Image size trained on the CNN
+        
+    classes: list of str
 
     image : ndarray
         Matrix representation. Must have dimensions that are multiples of 'cnn_trained_image_size'
@@ -734,15 +759,19 @@ def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes
     conv_name : str
         Name of the convolutional layer which we will generate the CAM
                 
-    overlay_alpha: float, optional, default: 0.3, values: [0,1]
+    overlay_alpha : float, optional, default: 0.3, values: [0,1]
         Transparency of the cam overlay on top of the original image
           
+    overlay_predictions : bool, optional, default: False
+        Overlay prediction of each sub-image
+          
     overlay_text_color : str
-        RGB color of the overlay prediction text
+        RGB color of the overlay prediction text. Ignored if 'overlay_predictions' is False
     
     Returns
     --------
     new_image : array_like
+    my_dict : dict
     '''
     
     
@@ -758,6 +787,10 @@ def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes
     # new image placeholder
     new_image = np.zeros((height+1, width+1, chn))
     
+    # we will keep track of the average prediction
+    avg_pred = np.asarray([0.0] * len(classes))
+    counter = 0
+    
     # show top 3 classes for each subimage
     IMAGES_TO_SHOW = 3
     
@@ -769,14 +802,26 @@ def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes
         # go through all the sub-image sections in the vertical
         for j in list(range(0,(height-cnn_trained_image_size)+1,cnn_trained_image_size)):
             # get current sub-image
-            sub_img = image[j:j+cnn_trained_image_size,i:i+cnn_trained_image_size,:]
-            
-            # get cam of desired class
-            overlay_cam, pred = get_multi_layered_cam(model, sub_img, classes, conv_name, overlay_alpha=overlay_alpha, threshold=0.3,
-                          show_top_x_classes=IMAGES_TO_SHOW, pretty_top_predictions=True)
+            sub_img = image[j:j+cnn_trained_image_size,i:i+cnn_trained_image_size,:]  
             
             # show on subimage the top 3 predictions 
-            overlay_prediction_on_image(overlay_cam, pred, overlay_text_color)
+            if overlay_predictions:
+                # get cam of desired class (and prettyify predictions for overlay purposes)
+                overlay_cam, pred = get_multi_layered_cam(model, sub_img, classes, conv_name, overlay_alpha=overlay_alpha, threshold=0.3,
+                          show_top_x_classes=IMAGES_TO_SHOW, pretty_top_predictions=True)
+            
+                overlay_prediction_on_image(overlay_cam, pred, overlay_text_color)
+                
+            else:  
+                # get cam of desired class
+                overlay_cam, pred = get_multi_layered_cam(model, sub_img, classes, conv_name, overlay_alpha=overlay_alpha, threshold=0.3,
+                          show_top_x_classes=IMAGES_TO_SHOW, pretty_top_predictions=False)
+                
+                # add pred to total
+                avg_pred += pred
+                
+                # add counter in order to divide avg_pred at end to get average
+                counter += 1
               
             # put sub-image into correct spot of matrix (recreating image)
             new_image[j:j+cnn_trained_image_size,i:i+cnn_trained_image_size,:] = overlay_cam
@@ -786,7 +831,16 @@ def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes
             
     # progress bar
     print('Complete')
+    
+    # only if we are not overlay prediction do we need avg pred
+    my_dict = {}
+    if not overlay_predictions:
+        # calculate average pred
+        avg_pred = avg_pred / counter
+
+        for i in range(len(classes)):
+            my_dict[classes[i]] = avg_pred[i]
                
     # return recreated image    
-    return new_image.astype(np.uint8) 
+    return new_image.astype(np.uint8), my_dict
 
