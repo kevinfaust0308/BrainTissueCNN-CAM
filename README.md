@@ -1,16 +1,18 @@
-# Keras CAM Implementation on large images (extension of KerasClassActivationMap)
+# Keras Class Activation Map on large images (single & multi layer options)
 
-Given a larger image than the CNN was trained on (dimensions must be multiples of original training dimension), generates the CAM on the entire image.
+Given a larger image than the CNN was trained on, generates the CAM on the entire image. If image dimensions are not multiples of the CNN's trained image size, rightmost and/or bottommost parts of the image are ignored.
 
-Works well with medical imaging or other images where spacial structure is not-important (large image is comprised of repeated smaller images)
+Works well with medical imaging or other images where spacial structure is not-important. Concretely, images that are comprised of repeated smaller images which are identifiable even if the entire image is not present are required.
 
-Please note, multi-layered CAM currently works with **at most 7 classes**
+Please note, multi-layered CAM currently works with **at most 7 classes** (due to unique color constraints)
 
 ## Getting Started
 
-Within CAM_custom_large_image.py, please read docstring of:
-1. overlay_cam_large_image
-2. overlay_multi_stacked_cam_large_image
+1. overlay_single_layered_cam_large_image
+Given a large image, generates heatmap on a specific class of interest 
+
+2. overlay_multi_layered_cam_large_image
+Given a large image, generates heatmap using the top-x predicted classes
 
 Must have a keras model with a global average pooling layer after the final convolution layer followed by a single input -> output layer 
 
@@ -28,13 +30,13 @@ OpenCV for CAM overlay on image
 
 ### Results
 
-#### Single Layer (shows areas that contain gray matter brain tissue
+#### Single Layer (shows areas that contain gray matter brain tissue)
 
-![Alt text](multi_tiled_tissue_SINGLE_LAYER_NO_BLANK_CAM.jpg?raw=true "Single CAM Overlay")
+![Alt text](images/generated_heatmap_SINGLE.png?raw=true "Single CAM Overlay")
 
 #### Multi Layer (shows areas of multiple classes)
 
-![Alt text](multi_tiled_tissue_NO_BLANK_CAM.jpg?raw=true "Multi CAM Overlay")
+![Alt text](images/generated_heatmap.png?raw=true "Multi CAM Overlay")
 
 ## License
 
