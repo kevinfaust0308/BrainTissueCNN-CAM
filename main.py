@@ -23,7 +23,7 @@ def generate_heatmap_single_layer():
     # get heatmap of specified class
     heatmap_class = 'Gray Mat.'
 
-    cam, _ = overlay_single_layered_cam_large_image(model, trained_img_size, classes, im, conv_block, heatmap_class,
+    cam = overlay_single_layered_cam_large_image(model, trained_img_size, classes, im, conv_block, heatmap_class,
                                                     overlay_alpha=a,
                                                     overlay_predictions=overlay_pred,
                                                     overlay_text_color=text_color)
@@ -39,7 +39,7 @@ def generate_heatmap_multi():
     im = plt.imread('multi_tiled_tissue.jpg')
 
     # get heatmap with top 3 images in each tile
-    cam, _ = overlay_multi_layered_cam_large_image(model, trained_img_size, classes, im, conv_block, overlay_alpha=a,
+    cam = overlay_multi_layered_cam_large_image(model, trained_img_size, classes, im, conv_block, overlay_alpha=a,
                                                    overlay_predictions=overlay_pred, overlay_text_color=text_color)
 
     # save heatmap generated

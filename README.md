@@ -28,13 +28,25 @@ pip install numpy
 
 OpenCV for CAM overlay on image
 
-### Results
+## Results
 
-#### Single Layer (shows areas that contain gray matter brain tissue)
+#### Single Layer
 
-![Alt text](images/generated_heatmap_SINGLE.png?raw=true "Single CAM Overlay")
+##### 1. Areas that contain gray matter brain tissue
 
-#### Multi Layer (shows areas of multiple classes)
+![Alt text](images/generated_heatmap_GRAYMATTER.png?raw=true "Single CAM Overlay")
+
+##### 2. Areas that contain white matter brain tissue
+
+![Alt text](images/generated_heatmap_WHITEMATTER.png?raw=true "Single CAM Overlay")
+
+##### 3. Areas that contain blank space
+
+![Alt text](images/single_class_heatmap_BLANK.png?raw=true "Single CAM Overlay")
+
+#### Multi Layer 
+
+##### Areas of multiple classes
 
 ![Alt text](images/generated_heatmap.png?raw=true "Multi CAM Overlay")
 

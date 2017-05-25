@@ -403,10 +403,6 @@ def get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, cl
     # new image placeholder (will hold our recreated image)
     new_image = np.zeros((height, width, chn))
 
-    # we will keep track of the average prediction (dominant prediction)
-    avg_pred = np.asarray([0.0] * len(classes))
-    counter = 0
-
     # this is a slow process so add progress bar
     print('Analyzing')
 
@@ -438,10 +434,8 @@ def get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, cl
             if overlay_predictions:
                 overlay_prediction_on_image(overlay_cam, pred, overlay_text_color)
             else:
-                # add pred to total
-                avg_pred += pred
-                # add counter in order to divide avg_pred at end to get average
-                counter += 1
+                # TODO: potentially do something else? averaging the prediction wasnt very useful
+                pass
 
             # put sub-image into correct spot of matrix (recreating image)
             new_image[j:j + cnn_trained_image_size, i:i + cnn_trained_image_size, :] = overlay_cam
@@ -449,18 +443,8 @@ def get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, cl
     # progress bar
     print('\nComplete')
 
-    # only if we are not overlay prediction will we calculate "average" prediction
-    # TODO: consider alternatives not sure how useful this is
-    my_dict = {}
-    if not overlay_predictions:
-        # calculate average pred
-        avg_pred = avg_pred / counter
-
-        for i in range(len(classes)):
-            my_dict[classes[i]] = avg_pred[i]
-
     # return recreated image
-    return new_image.astype(np.uint8), my_dict
+    return new_image.astype(np.uint8)
 
 
 def overlay_single_layered_cam_large_image(model, cnn_trained_image_size, classes, image, conv_name, class_name,
