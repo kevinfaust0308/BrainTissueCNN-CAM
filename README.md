@@ -34,11 +34,11 @@ OpenCV for CAM overlay on image
 
 ##### 1. Areas that contain gray matter brain tissue
 
-![Alt text](images/generated_heatmap_GRAYMATTER.png?raw=true "Single CAM Overlay")
+![Alt text](images/single_class_heatmap_GRAYMATTER.png?raw=true "Single CAM Overlay")
 
 ##### 2. Areas that contain white matter brain tissue
 
-![Alt text](images/generated_heatmap_WHITEMATTER.png?raw=true "Single CAM Overlay")
+![Alt text](images/single_class_heatmap_WHITEMATTER.png?raw=true "Single CAM Overlay")
 
 ##### 3. Areas that contain blank space
 
