@@ -16,10 +16,11 @@ from PIL import Image
 COLORMAPS = ['Reds', 'Blues', 'Greens', 'Purples', 'Oranges', 'Greys', 'jet']
 
 
-def get_pred(model, img):
+def get_convolved_image_and_pred(model, img, conv_layer):
     '''
-    Image predictions
+    Returns convolved image after the specified convolutional layer as well as the predicted image class
     '''
+
     img = np.expand_dims(img, axis=0)
 
     # variables for easy access to needed layers
@@ -27,28 +28,12 @@ def get_pred(model, img):
     final_layer = model.layers[-1]
 
     # a function that takes in the input layer and outputs prediction of image
-    get_pred = function([input_layer.input], [final_layer.output])
+    get_output = function([input_layer.input], [conv_layer.output, final_layer.output])
 
-    # call function on our image
-    return get_pred([img])[0][0]
+    # run function
+    conv_img, pred = get_output([img])
 
-
-def get_convolved_image(model, img, conv_layer):
-    '''
-    Get convolved image after the specified convolutional layer
-    '''
-    img = np.expand_dims(img, axis=0)
-
-    # variables for easy access to needed layers
-    input_layer = model.layers[0]
-
-    # a function that takes in the input layer and outputs the convolved image after the last convolutional layer
-    get_conv_img = function([input_layer.input], [conv_layer.output])
-
-    # call function on our image
-    conv_img = get_conv_img([img])
-    # 1-element list -> 4d tensor -> 3d tensor
-    return conv_img[0][0]
+    return conv_img[0], pred[0]
 
 
 def get_conv_layer(model, conv_name):
@@ -209,11 +194,8 @@ def get_final_cam_overlay_and_pred(model, image, classes, conv_layer, overlay_al
     # image
     original_img = image / 255.
 
-    # get predictions
-    pred = get_pred(model, original_img)
-
-    # get convolved image after the specified conv_layer
-    conv_img = get_convolved_image(model, original_img, conv_layer)
+    # get convolved image after the specified conv_layer and the predictions
+    conv_img, pred = get_convolved_image_and_pred(model, original_img, conv_layer)
 
     # Get the input weights to the final layer
     class_weights = model.layers[-1].get_weights()[0]
