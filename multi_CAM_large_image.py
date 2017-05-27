@@ -147,26 +147,20 @@ def apply_cam_transparency(cam, overlay_alpha, remove_white_pixels):
     orig_height = cam.shape[0]
     orig_width = cam.shape[1]
 
-    # make cam have alpha transparency (4 channel)
-    # solid alpha for now
-    alpha = np.ones((orig_height, orig_width))
-    cam = np.dstack((cam, alpha))
+    # make alpha and set all to the preset overlay_alpha
+    alpha = np.empty(orig_height * orig_width)
+    alpha.fill((1 - overlay_alpha) * 255)
 
     # make unimportant heatmap areas be transparent to avoid overlay color dilution (if set to true)
     # reshape for looping
     cam = cam.reshape((orig_width * orig_height, cam.shape[2]))
-    # loop through each pixel
-    for pixel in cam:
-        # if we want to remove whitish pixels, check if current pixel averages to be whitish (values close to 255)
-        # then make it a transparent black pixel
-        if remove_white_pixels and np.mean(pixel[:3]) > 0.90 * 255:
-            pixel[:4] = 0
-        # otherwise, just make the alpha equal to overlay_alpha
-        else:
-            pixel[3] = (1 - overlay_alpha) * 255
+    if remove_white_pixels:
+        alpha[np.sum(cam, axis=1) > 0.90 * 255 * 3] = 0
 
     # reshape back to normal and return
-    return cam.reshape((orig_width, orig_height, cam.shape[1]))
+    cam = cam.reshape((orig_width, orig_height, cam.shape[1]))
+    alpha = alpha.reshape((orig_width, orig_height))
+    return np.dstack((cam, alpha))
 
 
 def get_image_with_cam(class_indices, class_weights, conv_img, original_img, overlay_alpha,
