@@ -40,15 +40,19 @@ OpenCV for CAM overlay on image
 
 ![Alt text](images/single_class_heatmap_WHITEMATTER.png?raw=true "Single CAM Overlay")
 
-##### 3. Areas that contain blank space
-
-![Alt text](images/single_class_heatmap_BLANK.png?raw=true "Single CAM Overlay")
-
 #### Multi Layer 
 
 ##### Areas of multiple classes
 
-![Alt text](images/generated_heatmap.png?raw=true "Multi CAM Overlay")
+###### | Blank --> Blue | Gray Mat. --> Green | Lesion --> Red | White Mat. --> Purple |
+
+##### Full
+
+![Alt text](images/HEATMAP_FULL.png?raw=true "Multi CAM Overlay")
+
+##### Zoomed in
+
+![Alt text](images/HEATMAP_ZOOMED.png?raw=true "Multi CAM Overlay")
 
 ## License
 

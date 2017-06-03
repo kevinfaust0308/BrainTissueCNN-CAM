@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-from keras.backend import function
+import keras.backend as K
 from PIL import Image
 
 ##############################################################
@@ -13,7 +13,30 @@ from PIL import Image
 
 # colormaps (https://matplotlib.org/examples/color/colormaps_reference.html)
 # for multi layered cam, these are some possible colors
-COLORMAPS = ['Reds', 'Blues', 'Greens', 'Purples', 'Oranges', 'Greys', 'jet']
+COLORMAPS = ['Blues', 'Greens', 'Reds', 'Purples', 'Oranges', 'Greys', 'jet']
+
+
+def blend_transparent(face_img, overlay_t_img):
+    # code from: https://stackoverflow.com/questions/36921496/how-to-join-png-with-alpha-transparency-in-a-frame-in-realtime/37198079#37198079
+
+    # Split out the transparency mask from the colour info
+    overlay_img = overlay_t_img[:, :, :3]  # Grab the RBG planes
+    overlay_mask = overlay_t_img[:, :, 3:]  # And the alpha plane
+
+    # Again calculate the inverse mask
+    background_mask = 255 - overlay_mask
+
+    # Turn the masks into three channel, so we can use them as weights
+    overlay_mask = cv2.cvtColor(overlay_mask, cv2.COLOR_GRAY2RGB)
+    background_mask = cv2.cvtColor(background_mask, cv2.COLOR_GRAY2RGB)
+
+    # Create a masked out face image, and masked out overlay
+    # We convert the images to floating point in range 0.0 - 1.0
+    face_part = (face_img * (1 / 255.0)) * (background_mask * (1 / 255.0))
+    overlay_part = (overlay_img * (1 / 255.0)) * (overlay_mask * (1 / 255.0))
+
+    # And finally just add them together, and rescale it back to an 8bit integer image
+    return np.uint8(cv2.addWeighted(face_part, 255.0, overlay_part, 255.0, 0.0))
 
 
 def get_convolved_image_and_pred(model, img, conv_layer):
@@ -28,7 +51,7 @@ def get_convolved_image_and_pred(model, img, conv_layer):
     final_layer = model.layers[-1]
 
     # a function that takes in the input layer and outputs prediction of image
-    get_output = function([input_layer.input], [conv_layer.output, final_layer.output])
+    get_output = K.function([input_layer.input], [conv_layer.output, final_layer.output])
 
     # run function
     conv_img, pred = get_output([img])
@@ -113,39 +136,42 @@ def apply_color_map_on_BW(bw, colormap):
     # change cam to rgb.
     cmap = plt.get_cmap(colormap)
 
-    # applying color map makes all the pixels be between 0 and 1
+    # applying color map is a two step process:
+    # first, image is normalized to 0-1 and then this number in the 0-1 range is
+    # mapped to a color using an instance of a subclass of Colormap
+    # NB: it is a RGBA image
     color = cmap(bw)
 
     # make it to ranges between 0-255
-    color = (color * 255).astype(np.uint8)
-
-    # return color-mapped cam
-    return np.delete(color, 3, 2)
+    return (color * 255).astype(np.float32)
 
 
 def apply_cam_transparency(cam, overlay_alpha, remove_white_pixels):
     '''
-    Applies an overlay alpha layer to a RGB cam and optionally makes whitish pixels transparent
+    Adjusts alpha layer of a RGBA cam and optionally makes whitish pixels transparent
     '''
 
     # original cam width and height
     orig_height = cam.shape[0]
     orig_width = cam.shape[1]
 
-    # make alpha and set all to the preset overlay_alpha
-    alpha = np.empty(orig_height * orig_width)
-    alpha.fill((1 - overlay_alpha) * 255)
+    # split image from alpha mask
+    rgb_img = cam[:, :, :3]
+
+    # set alpha matrix to the preset overlay_alpha
+    cam[:, :, 3] *= 1 - overlay_alpha
+
+    # reshape alpha matrix into a vector
+    alpha = cam[:, :, 3].reshape(orig_width * orig_height)
 
     # make unimportant heatmap areas be transparent to avoid overlay color dilution (if set to true)
-    # reshape for looping
-    cam = cam.reshape((orig_width * orig_height, cam.shape[2]))
+    # reshape rgb image
+    rgb_img = rgb_img.reshape((orig_width * orig_height, rgb_img.shape[2]))
     if remove_white_pixels:
-        alpha[np.sum(cam, axis=1) > 0.90 * 255 * 3] = 0
+        # change in place
+        alpha[np.sum(rgb_img, axis=1) > 0.9 * 255 * 3] = 0
 
-    # reshape back to normal and return
-    cam = cam.reshape((orig_width, orig_height, cam.shape[1]))
-    alpha = alpha.reshape((orig_width, orig_height))
-    return np.dstack((cam, alpha))
+    return cam
 
 
 def get_image_with_cam(class_indices, class_weights, conv_img, original_img, overlay_alpha,
@@ -157,9 +183,7 @@ def get_image_with_cam(class_indices, class_weights, conv_img, original_img, ove
     # dimensions of original image
     image_width_height = original_img.shape[1], original_img.shape[0]
 
-    # set the class activation map to be the original image which we will build up on top of
-    # change to PIL image
-    original_img = Image.fromarray((original_img * 255).astype(np.uint8))
+    original_img = (original_img * 255).astype(np.uint8)
 
     # loop through each class index and build its cam
     # overlay each cam over the original image
@@ -172,18 +196,12 @@ def get_image_with_cam(class_indices, class_weights, conv_img, original_img, ove
 
         # generate a cam in rgba form in same size as image
         cam = generate_single_cam_overlay(curr_class_weights, conv_img, colormap, image_width_height, overlay_alpha,
-                                          remove_white_pixels)
+                                          remove_white_pixels).astype(np.uint8)
 
-        # change cam to PIL image
-        cam = Image.fromarray(cam.astype(np.uint8))
+        # put rgba cam on top of original image
+        original_img = blend_transparent(original_img, cam)
 
-        # add cam overlay ontop of original image
-        original_img.paste(cam, (0, 0), cam)
-
-    # change PIL image to numpy array
-    original_img = np.asarray(list(original_img.getdata()))
-    # reshape and return
-    return original_img.reshape(image_width_height + (3,)).astype(np.uint8)
+    return original_img
 
 
 def get_final_cam_overlay_and_pred(model, image, classes, conv_layer, overlay_alpha, show_top_x_classes, class_idx):
@@ -228,7 +246,7 @@ def get_final_cam_overlay_and_pred(model, image, classes, conv_layer, overlay_al
 
 
 def get_single_layered_cam(model, image, classes, conv_layer, class_idx, overlay_alpha=0.3):
-    '''   
+    '''
     Returns the class activation map of a image class
 
     Class activation map is an unsupervised way of doing object localization with accuracy near par with supervised methods
@@ -239,8 +257,8 @@ def get_single_layered_cam(model, image, classes, conv_layer, class_idx, overlay
         Model to generate prediction and CAM off of
 
     image : ndarray
-        Matrix representation 
-        
+        Matrix representation
+
     classes: list of strings
         Names of all the classes the model was trained on
 
@@ -263,7 +281,7 @@ def get_single_layered_cam(model, image, classes, conv_layer, class_idx, overlay
 
 
 def get_multi_layered_cam(model, image, classes, conv_layer, overlay_alpha=0.3, show_top_x_classes=3):
-    '''   
+    '''
     Returns the image-to-predict overlayed with class activation maps
 
     Class activation map is an unsupervised way of doing object localization with accuracy near par with supervised methods
@@ -274,7 +292,7 @@ def get_multi_layered_cam(model, image, classes, conv_layer, overlay_alpha=0.3, 
         Model to generate prediction and CAM off of
 
     image : ndarray
-        Matrix representation 
+        Matrix representation
 
     classes: list of strings
         Names of all the classes the model was trained on
@@ -304,7 +322,7 @@ def overlay_prediction_on_image(image, pred, text_color):
     Parameters
     -----------
     image : ndarray
-        Matrix representation 
+        Matrix representation
 
     pred : dict of list
         Has label as key and list of accuracy + additional information in list format
@@ -379,16 +397,17 @@ def get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, cl
     # new image placeholder (will hold our recreated image)
     new_image = np.zeros((height, width, chn))
 
-    # this is a slow process so add progress bar
-    print('Analyzing')
+    l = len(range(0, (width - cnn_trained_image_size) + 1, cnn_trained_image_size))
+    w = len(range(0, (height - cnn_trained_image_size) + 1, cnn_trained_image_size))
+    x = 0
 
     # go through all the sub-image sections in the horizontal
-    for i in list(range(0, (width - cnn_trained_image_size) + 1, cnn_trained_image_size)):
-        # go through all the sub-image sections in the vertical
-        for j in list(range(0, (height - cnn_trained_image_size) + 1, cnn_trained_image_size)):
+    for i in range(0, (width - cnn_trained_image_size) + 1, cnn_trained_image_size):
 
-            # progress bar
-            print('.', end='')
+        t = time.clock()
+
+        # go through all the sub-image sections in the vertical
+        for j in range(0, (height - cnn_trained_image_size) + 1, cnn_trained_image_size):
 
             # get current sub-image
             sub_img = image[j:j + cnn_trained_image_size, i:i + cnn_trained_image_size, :]
@@ -416,8 +435,8 @@ def get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, cl
             # put sub-image into correct spot of matrix (recreating image)
             new_image[j:j + cnn_trained_image_size, i:i + cnn_trained_image_size, :] = overlay_cam
 
-    # progress bar
-    print('\nComplete')
+        x += 1
+        print("{:0.2f}% ({}/{} tiles) in {:0.2f}s".format(x * 100.0 / l, x * w, l * w, time.clock() - t))
 
     # return recreated image
     return new_image.astype(np.uint8)
@@ -427,8 +446,8 @@ def overlay_single_layered_cam_large_image(model, cnn_trained_image_size, classe
                                            overlay_alpha=0.5,
                                            overlay_predictions=False,
                                            overlay_text_color=(0, 0, 0)):
-    ''' 
-    Takes in a larger image than what the CNN model was trained on and returns a single-CAM overlay (based on the chosen class). 
+    '''
+    Takes in a larger image than what the CNN model was trained on and returns a single-CAM overlay (based on the chosen class).
     If image dimensions are not multiples of the CNN's trained image size, rightmost and/or bottommost parts of the image are ignored.
     Returns total average prediction if 'overlay_predictions' is False. Otherwise, shows individual sub-image predictions
     as overlay
@@ -487,12 +506,12 @@ def overlay_single_layered_cam_large_image(model, cnn_trained_image_size, classe
 def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes, image, conv_name, overlay_alpha=0.5,
                                           show_top_x_classes=3, overlay_predictions=False,
                                           overlay_text_color=(0, 0, 0)):
-    ''' 
+    '''
     Takes in a larger image than what the CNN model was trained on and returns a multi-CAM overlay. If image dimensions
     are not multiples of the CNN's trained image size, rightmost and/or bottommost parts of the image are ignored.
     Returns total average prediction if 'overlay_predictions' is False. Otherwise, shows individual sub-image predictions
     as overlay
-    
+
     Each overlay on each subimage will have at most its top 5 predicted classes shown.
     Currently supports as many classes as colormap values (7)
 
@@ -516,7 +535,7 @@ def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes
 
     overlay_alpha : float, optional, default: 0.5, values: [0,1]
         Transparency of the cam overlay on top of the original image
-        
+
     show_top_x_classes: int, optional, default: None, values: [0,5]
         Overlays cam's of x classes that have the highest probabilities
 
@@ -545,3 +564,63 @@ def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes
                                                       class_idx=None, show_top_x_classes=show_top_x_classes,
                                                       overlay_predictions=overlay_predictions,
                                                       overlay_text_color=overlay_text_color)
+
+
+########################################################################################################################
+
+def generate_heatmap_single_layer():
+    # image to do heatmap on
+    im = cv2.imread('img/small_tiled_tissue.jpg')
+
+    # get heatmap of specified class
+    heatmap_class = 'Gray Mat.'
+
+    cam = overlay_single_layered_cam_large_image(model, trained_img_size, classes, im, conv_block, heatmap_class,
+                                                 overlay_alpha=a,
+                                                 overlay_predictions=overlay_pred,
+                                                 overlay_text_color=text_color)
+
+    # save heatmap generated
+    plt.imsave('img/generated_heatmapOPENCV_single.png', cam)
+
+    return cam
+
+
+def generate_heatmap_multi():
+    # image to do heatmap on
+    im = cv2.imread('img/multi_tiled_tissue.jpg')
+
+    start = time.time()
+
+    # get heatmap with top 3 images in each tile
+    cam = overlay_multi_layered_cam_large_image(model, trained_img_size, classes, im, conv_block, overlay_alpha=a,
+                                                overlay_predictions=overlay_pred, show_top_x_classes=show_top_x_classes,
+                                                overlay_text_color=text_color)
+
+    print(time.time() - start)
+
+    # save heatmap generated
+    plt.imsave('img/generated_heatmapOPENCV.png', cam)
+
+    return cam
+
+
+if __name__ == '__main__':
+    from keras.models import load_model
+    import time
+
+    # load model
+    model = load_model('VGG19_trained.h5')
+
+    ### configurations
+    show_top_x_classes = 4  # show everything
+    overlay_pred = True  # get heatmap with predictions written over each tile
+    trained_img_size = 304  # size of each tile (size our cnn was trained on)
+    conv_block = 'block5_conv4'  # name of the final convolutional layer (for vgg) (can view layers using model.summary())
+    text_color = (0, 255, 80)  # overlay text color
+    classes = ['Blank', 'Gray Mat.', 'White Mat.']  # classes model was trained on. ordering matters
+    a = 0.3  # heatmap transparency
+
+    # import cProfile
+    # cProfile.run('generate_heatmap_multi()')
+    heatmap = generate_heatmap_multi()
