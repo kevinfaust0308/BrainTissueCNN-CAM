@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 import keras.backend as K
-from PIL import Image
+import time
 
 ##############################################################
 # Main functions (at bottom):
@@ -564,63 +564,3 @@ def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes
                                                       class_idx=None, show_top_x_classes=show_top_x_classes,
                                                       overlay_predictions=overlay_predictions,
                                                       overlay_text_color=overlay_text_color)
-
-
-########################################################################################################################
-
-def generate_heatmap_single_layer():
-    # image to do heatmap on
-    im = cv2.imread('img/small_tiled_tissue.jpg')
-
-    # get heatmap of specified class
-    heatmap_class = 'Gray Mat.'
-
-    cam = overlay_single_layered_cam_large_image(model, trained_img_size, classes, im, conv_block, heatmap_class,
-                                                 overlay_alpha=a,
-                                                 overlay_predictions=overlay_pred,
-                                                 overlay_text_color=text_color)
-
-    # save heatmap generated
-    plt.imsave('img/generated_heatmapOPENCV_single.png', cam)
-
-    return cam
-
-
-def generate_heatmap_multi():
-    # image to do heatmap on
-    im = cv2.imread('img/multi_tiled_tissue.jpg')
-
-    start = time.time()
-
-    # get heatmap with top 3 images in each tile
-    cam = overlay_multi_layered_cam_large_image(model, trained_img_size, classes, im, conv_block, overlay_alpha=a,
-                                                overlay_predictions=overlay_pred, show_top_x_classes=show_top_x_classes,
-                                                overlay_text_color=text_color)
-
-    print(time.time() - start)
-
-    # save heatmap generated
-    plt.imsave('img/generated_heatmapOPENCV.png', cam)
-
-    return cam
-
-
-if __name__ == '__main__':
-    from keras.models import load_model
-    import time
-
-    # load model
-    model = load_model('VGG19_trained.h5')
-
-    ### configurations
-    show_top_x_classes = 4  # show everything
-    overlay_pred = True  # get heatmap with predictions written over each tile
-    trained_img_size = 304  # size of each tile (size our cnn was trained on)
-    conv_block = 'block5_conv4'  # name of the final convolutional layer (for vgg) (can view layers using model.summary())
-    text_color = (0, 255, 80)  # overlay text color
-    classes = ['Blank', 'Gray Mat.', 'White Mat.']  # classes model was trained on. ordering matters
-    a = 0.3  # heatmap transparency
-
-    # import cProfile
-    # cProfile.run('generate_heatmap_multi()')
-    heatmap = generate_heatmap_multi()

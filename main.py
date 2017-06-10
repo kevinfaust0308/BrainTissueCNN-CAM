@@ -1,6 +1,6 @@
 from keras.models import load_model
-import matplotlib.pyplot as plt
 import time
+import cv2
 
 from multi_CAM_large_image import overlay_multi_layered_cam_large_image, overlay_single_layered_cam_large_image
 
@@ -16,39 +16,40 @@ classes = ['Blank', 'Gray Mat.', 'White Mat.']  # classes model was trained on. 
 a = 0.3  # heatmap transparency
 
 
-def generate_heatmap_single_layer():
+def generate_heatmap_single_layer(img_path, save_path):
     # image to do heatmap on
-    im = plt.imread('small_tiled_tissue.jpg')
+    im = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
 
     # get heatmap of specified class
     heatmap_class = 'Gray Mat.'
 
     cam = overlay_single_layered_cam_large_image(model, trained_img_size, classes, im, conv_block, heatmap_class,
-                                                    overlay_alpha=a,
-                                                    overlay_predictions=overlay_pred,
-                                                    overlay_text_color=text_color)
+                                                 overlay_alpha=a,
+                                                 overlay_predictions=overlay_pred,
+                                                 overlay_text_color=text_color)
 
     # save heatmap generated
-    plt.imsave('generated_heatmap_SINGLE.png', cam)
+    cv2.imwrite(save_path, cv2.cvtColor(cam, cv2.COLOR_RGB2BGR))
 
     return cam
 
 
-def generate_heatmap_multi():
+def generate_heatmap_multi(img_path, save_path):
     # image to do heatmap on
-    im = plt.imread('multi_tiled_tissue.jpg')
+    im = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
 
     # get heatmap with top 3 images in each tile
     cam = overlay_multi_layered_cam_large_image(model, trained_img_size, classes, im, conv_block, overlay_alpha=a,
-                                                   overlay_predictions=overlay_pred, overlay_text_color=text_color)
+                                                overlay_predictions=overlay_pred, overlay_text_color=text_color)
 
     # save heatmap generated
-    plt.imsave('generated_heatmap.png', cam)
+    cv2.imwrite(save_path, cv2.cvtColor(cam, cv2.COLOR_RGB2BGR))
 
     return cam
 
 
 if __name__ == '__main__':
     start_time = time.clock()
-    heatmap = generate_heatmap_single_layer()
+    heatmap = generate_heatmap_single_layer('small_tiled_tissue.jpg', 'generated_heatmap_SINGLE.png')
+    # heatmap = generate_heatmap_multi('multi_tiled_tissue.jpg', 'generated_heatmap.png')
     print(time.clock() - start_time, "seconds")
