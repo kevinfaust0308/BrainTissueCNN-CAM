@@ -14,7 +14,7 @@ import time
 # colormaps (https://matplotlib.org/examples/color/colormaps_reference.html)
 # for multi layered cam, these are some possible colors
 COLORMAPS = ['Blues', 'Greens', 'Reds', 'Purples', 'Oranges', 'Greys']
-SINGLE_CAM_OVERLAY_COLORMAP = 'jet'
+SINGLE_CAM_OVERLAY_COLORMAP = 'YlOrRd'
 
 
 def blend_transparent(face_img, overlay_t_img):

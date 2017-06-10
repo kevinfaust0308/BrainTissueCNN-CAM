@@ -1,10 +1,13 @@
-# Keras Class Activation Map on large images (single & multi layer options)
+# Keras heatmap generator on large images (single & multi layer options)
 
-Given a larger image than the CNN was trained on, generates the CAM on the entire image. If image dimensions are not multiples of the CNN's trained image size, rightmost and/or bottommost parts of the image are ignored.
+Given an image of any size, generates a single or multi-layered heatmap over the entire image. You can choose to see which parts of the image represent a certain class or see which parts of the image represent different classes. Alongside the generated heatmap, returns a predicted percent breakdown of each class within the image
 
 Works well with medical imaging or other images where spacial structure is not-important. Concretely, images that are comprised of repeated smaller images which are identifiable even if the entire image is not present are required.
 
-Please note, multi-layered CAM currently works with **at most 7 classes** (due to unique color constraints)
+Notes
+1. Although an image of any size is usable, it cannot be smaller than the image dimensions your CNN was trained on
+2. If image dimensions are not multiples of the CNN's trained image size, rightmost and/or bottommost parts of the image are ignored
+3. multi-layered CAM currently works with **up to 6 classes**
 
 ## Getting Started
 
@@ -14,31 +17,30 @@ Given a large image, generates heatmap on a specific class of interest
 2. overlay_multi_layered_cam_large_image
 Given a large image, generates heatmap using the top-x predicted classes
 
-Must have a keras model with a global average pooling layer after the final convolution layer followed by a single input -> output layer 
+Built for the VGG models (or any sequential model) with a global average pooling layer followed by a single input -> output layer
 
 Included jupyer notebook contains examples 
 
 ### Prerequisites
 
 ```
-pip install matplotlib
-pip install keras
-pip install numpy
+keras
+matplotlib
+numpy
+opencv
 ```
-
-OpenCV for CAM overlay on image
 
 ## Results
 
-#### Single Layer
+#### Single Layer (red = strong prediction)
 
 ##### 1. Areas that contain gray matter brain tissue
 
-![Alt text](images/single_class_heatmap_GRAYMATTER.png?raw=true "Single CAM Overlay")
+![Alt text](images/single_class_heatmap_GRAYMATTER.jpg?raw=true "Single CAM Overlay")
 
 ##### 2. Areas that contain white matter brain tissue
 
-![Alt text](images/single_class_heatmap_WHITEMATTER.png?raw=true "Single CAM Overlay")
+![Alt text](images/single_class_heatmap_WHITEMATTER.jpg?raw=true "Single CAM Overlay")
 
 #### Multi Layer 
 
@@ -49,10 +51,6 @@ OpenCV for CAM overlay on image
 ##### Full
 
 ![Alt text](images/HEATMAP_FULL.png?raw=true "Multi CAM Overlay")
-
-##### Zoomed in
-
-![Alt text](images/HEATMAP_ZOOMED.png?raw=true "Multi CAM Overlay")
 
 ## License
 
