@@ -14,6 +14,7 @@ import time
 # colormaps (https://matplotlib.org/examples/color/colormaps_reference.html)
 # for multi layered cam, these are some possible colors
 COLORMAPS = ['Blues', 'Greens', 'Reds', 'Purples', 'Oranges', 'Greys']
+SINGLE_CAM_OVERLAY_COLORMAP = 'jet'
 
 
 def blend_transparent(face_img, overlay_t_img):
@@ -106,8 +107,8 @@ def generate_cam(class_weights, conv_img):
     return np.matmul(temp, class_weights).reshape(output_shape)
 
 
-def generate_single_cam_overlay(class_weights, conv_img, colormap, image_width_height, overlay_alpha,
-                                remove_white_pixels):
+def generate_cam_for_overlay(class_weights, conv_img, colormap, image_width_height, overlay_alpha,
+                             remove_white_pixels):
     '''
     Generates cam overlay over entire image
     '''
@@ -143,7 +144,7 @@ def apply_color_map_on_BW(bw, colormap):
     color = cmap(bw)
 
     # make it to ranges between 0-255
-    return (color * 255).astype(np.float32)
+    return color * 255
 
 
 def apply_cam_transparency(cam, overlay_alpha, remove_white_pixels):
@@ -191,12 +192,17 @@ def get_image_with_cam(class_indices, class_weights, conv_img, original_img, ove
         # get the class weights of the current class index (WEIGHTSxNUM_CLASSES)
         curr_class_weights = class_weights[:, class_idx]
 
-        # get the color map to use
-        colormap = COLORMAPS[class_idx]
+        # if we are doing single cam, we just use the 'jet' colormap. allows us to use infinite classes for single cam
+        if len(class_indices) == 1:
+            colormap = SINGLE_CAM_OVERLAY_COLORMAP
+        # otherwise the colormap we use is based on the class index
+        else:
+            # get the color map to use
+            colormap = COLORMAPS[class_idx]
 
         # generate a cam in rgba form in same size as image
-        cam = generate_single_cam_overlay(curr_class_weights, conv_img, colormap, image_width_height, overlay_alpha,
-                                          remove_white_pixels).astype(np.uint8)
+        cam = generate_cam_for_overlay(curr_class_weights, conv_img, colormap, image_width_height, overlay_alpha,
+                                       remove_white_pixels).astype(np.uint8)
 
         # put rgba cam on top of original image
         original_img = blend_transparent(original_img, cam)
@@ -204,7 +210,7 @@ def get_image_with_cam(class_indices, class_weights, conv_img, original_img, ove
     return original_img
 
 
-def get_final_cam_overlay_and_pred(model, image, classes, conv_layer, overlay_alpha, show_top_x_classes, class_idx):
+def get_final_cam_overlay_and_pred(model, image, conv_layer, overlay_alpha, show_top_x_classes, class_idx):
     '''
     Returns single cam overlay (if class_idx is not None) or multi cam overlay (if show_top_x_classes is not None)
     '''
@@ -235,150 +241,35 @@ def get_final_cam_overlay_and_pred(model, image, classes, conv_layer, overlay_al
     # get single overlayed cam over image, keeping or throwing away low confidence pixels
     cam = get_image_with_cam(class_indices, class_weights, conv_img, original_img, overlay_alpha, remove_white_pixels)
 
-    # our more easier to read prediction
-    new_pred = {}
-    for j in class_indices:
-        # get label for this class and add as a key and add the prediction score
-        new_pred[classes[j]] = pred[j]
-
     # return cam and our class predictions
-    return cam, new_pred
+    return cam, pred
 
 
-def get_single_layered_cam(model, image, classes, conv_layer, class_idx, overlay_alpha=0.3):
+def get_single_layered_cam(model, image, conv_layer, class_idx, overlay_alpha):
     '''
     Returns the class activation map of a image class
-
-    Class activation map is an unsupervised way of doing object localization with accuracy near par with supervised methods
-
-    Parameters
-    -----------
-    model : '~keras.models'
-        Model to generate prediction and CAM off of
-
-    image : ndarray
-        Matrix representation
-
-    classes: list of strings
-        Names of all the classes the model was trained on
-
-    conv_layer : '~keras.layers'
-        Convolutional layer which we will generate the CAM
-
-    class_name: str
-        Name of class to generate cam on
-
-    overlay_alpha: float, optional, default: 0.5, values: [0,1]
-        Transparency of the cam overlay on top of the original image. 'overlay_alpha' is ignored if 'overlay' is False
-
-    Returns
-    --------
-    cam : array_like
-    pred: array_like
     '''
 
-    return get_final_cam_overlay_and_pred(model, image, classes, conv_layer, overlay_alpha, None, class_idx)
+    return get_final_cam_overlay_and_pred(model, image, conv_layer, overlay_alpha, None, class_idx)
 
 
-def get_multi_layered_cam(model, image, classes, conv_layer, overlay_alpha=0.3, show_top_x_classes=3):
+def get_multi_layered_cam(model, image, conv_layer, overlay_alpha, show_top_x_classes):
     '''
-    Returns the image-to-predict overlayed with class activation maps
-
-    Class activation map is an unsupervised way of doing object localization with accuracy near par with supervised methods
-
-    Parameters
-    -----------
-    model : '~keras.models'
-        Model to generate prediction and CAM off of
-
-    image : ndarray
-        Matrix representation
-
-    classes: list of strings
-        Names of all the classes the model was trained on
-
-    conv_layer : '~keras.layers'
-        Convolutional layer which we will generate the CAM
-
-    overlay_alpha: float, optional, default: 0.3, values: [0,1]
-        Transparency of the cam overlay on top of the original image
-
-    show_top_x_classes: int, optional, default: None, values: [0,5]
-        Overlays cam's of x classes that have the highest probabilities
-
-    Returns
-    --------
-    cam : array_like
-    pred: dict
+    Returns the image-to-predict overlayed with multiple class activation maps
     '''
 
-    return get_final_cam_overlay_and_pred(model, image, classes, conv_layer, overlay_alpha, show_top_x_classes, None)
+    return get_final_cam_overlay_and_pred(model, image, conv_layer, overlay_alpha, show_top_x_classes, None)
 
 
-def overlay_prediction_on_image(image, pred, text_color):
-    '''
-    Takes a CAM overlayed image and writes predictions over it inplace
-
-    Parameters
-    -----------
-    image : ndarray
-        Matrix representation
-
-    pred : dict of list
-        Has label as key and list of accuracy + additional information in list format
-
-    text_color : tuple of int
-        RGB tuple
-
-    Returns
-    --------
-    None
-    '''
-
-    my_list = []
-
-    # loop through all classes and its predictions
-    for label in pred:
-        p = '{:.2f}'.format(pred[label] * 100)  # make pred accuracy 2 decimals
-        text = '{}: {}%'.format(label, p)
-        my_list.append(text)
-
-    # starting top offset
-    top_offset = 30
-
-    # loop through all those pred labels and add to image
-    for label in my_list:
-        cv2.putText(
-            image,  # put text on this image
-            label,  # text
-            (10, top_offset),  # left offset, top offset
-            cv2.FONT_HERSHEY_SIMPLEX,  # font family
-            0.6,  # scale of text size
-            text_color,  # color
-            1,  # line width
-            cv2.LINE_AA  # line type
-        )
-
-        # move next text down for spacing
-        top_offset += 30
-
-
-def get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, classes, image, conv_name, overlay_alpha,
-                                               show_top_x_classes, class_idx, overlay_predictions,
-                                               overlay_text_color):
+def get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, num_classes, image, conv_name,
+                                               overlay_alpha,
+                                               show_top_x_classes, class_idx):
     # check for invalid params
     if not (0 <= overlay_alpha <= 1):
         raise Exception("Invalid overlay_alpha given")
 
     if (image.shape[0] < cnn_trained_image_size) or (image.shape[1] < cnn_trained_image_size):
         raise Exception("Image too small")
-
-    if len(classes) > len(COLORMAPS):
-        raise Exception("Only {} classes are currently supported".format(str(len(COLORMAPS))))
-
-    # show user what color each class on the cam will be. currently restricted to having 7 classes (one for each colormap)
-    for i, _class in enumerate(classes):
-        print('{} --> {}'.format(_class, COLORMAPS[i][:-1]))
 
     # shape of image
     height, width, chn = image.shape
@@ -395,7 +286,11 @@ def get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, cl
     conv_layer = get_conv_layer(model, conv_name)
 
     # new image placeholder (will hold our recreated image)
-    new_image = np.zeros((height, width, chn))
+    new_image = np.zeros((height, width, chn), dtype=np.uint8)
+
+    # average prediction counter
+    tot_pred = np.zeros(num_classes)
+    counter = 0
 
     l = len(range(0, (width - cnn_trained_image_size) + 1, cnn_trained_image_size))
     w = len(range(0, (height - cnn_trained_image_size) + 1, cnn_trained_image_size))
@@ -415,46 +310,55 @@ def get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, cl
             # determine whether single or multi cam
             if show_top_x_classes is not None:
                 # get stacked cam of top x classes
-                overlay_cam, pred = get_multi_layered_cam(model, sub_img, classes, conv_layer,
+                overlay_cam, pred = get_multi_layered_cam(model, sub_img, conv_layer,
                                                           overlay_alpha=overlay_alpha,
                                                           show_top_x_classes=show_top_x_classes)
 
             elif class_idx is not None:
                 # single layer cam of specific class
-                overlay_cam, pred = get_single_layered_cam(model, sub_img, classes, conv_layer,
+                overlay_cam, pred = get_single_layered_cam(model, sub_img, conv_layer,
                                                            overlay_alpha=overlay_alpha,
                                                            class_idx=class_idx)
 
-            # show on subimage the class and predictions
-            if overlay_predictions:
-                overlay_prediction_on_image(overlay_cam, pred, overlay_text_color)
-            else:
-                # TODO: potentially do something else? averaging the prediction wasnt very useful
-                pass
+            tot_pred += pred
+            counter += 1
 
             # put sub-image into correct spot of matrix (recreating image)
-            new_image[j:j + cnn_trained_image_size, i:i + cnn_trained_image_size, :] = overlay_cam
+            new_image[j:j + cnn_trained_image_size, i:i + cnn_trained_image_size, :] = overlay_cam.astype(np.uint8)
 
         x += 1
         print("{:0.2f}% ({}/{} tiles) in {:0.2f}s".format(x * 100.0 / l, x * w, l * w, time.clock() - t))
 
     # return recreated image
-    return new_image.astype(np.uint8)
+    return new_image, tot_pred / counter
+
+
+def englishify_pred(pred, classes, is_multi):
+    '''
+    Takes raw array predictions and makes it into a readable string
+    '''
+
+    result = ''
+
+    # loop through each class and combine class with pred
+    for i in range(len(classes)):
+        result += '{}: {:.2f}%'.format(classes[i], pred[i])
+
+        # if multi-layer, add colormap color
+        if is_multi:
+            result += ' ({})'.format(COLORMAPS[i][:-1])
+        result += '\n'
+
+    return result
 
 
 def overlay_single_layered_cam_large_image(model, cnn_trained_image_size, classes, image, conv_name, class_name,
-                                           overlay_alpha=0.5,
-                                           overlay_predictions=False,
-                                           overlay_text_color=(0, 0, 0)):
+                                           overlay_alpha=0.5):
     '''
-    Takes in a larger image than what the CNN model was trained on and returns a single-CAM overlay (based on the chosen class).
-    If image dimensions are not multiples of the CNN's trained image size, rightmost and/or bottommost parts of the image are ignored.
-    Returns total average prediction if 'overlay_predictions' is False. Otherwise, shows individual sub-image predictions
-    as overlay
-
-    Currently supports as many classes as colormap values (7)
-
-    Class activation map is an unsupervised way of doing object localization with accuracy near par with supervised methods
+    Takes in an image of any size (>= cnn_trained_image_size) and returns a heatmap overlay based on the chosen class.
+    Rightmost and/or bottommost parts of the image are ignored if image dimensions are not
+    multiples of the CNN's trained image size. Additionally returns a predicted percent breakdown
+    of each class' presence within the image
 
     Parameters
     -----------
@@ -472,22 +376,16 @@ def overlay_single_layered_cam_large_image(model, cnn_trained_image_size, classe
     conv_name : str
         Name of the convolutional layer which we will generate the CAM
 
-    class_idx: str
-        Overlay cam of this specific class over the original image
+    class_name: str
+        Name of class to generate cam on
 
     overlay_alpha : float, optional, default: 0.5, values: [0,1]
         Transparency of the cam overlay on top of the original image
 
-    overlay_predictions : bool, optional, default: False
-        Overlay prediction of each sub-image
-
-    overlay_text_color : tuple of int
-        RGB color of the overlay prediction text. Ignored if 'overlay_predictions' is False
-
     Returns
     --------
     new_image : array_like
-    my_dict : dict
+    pred : str
     '''
 
     if class_name and class_name not in classes:
@@ -496,26 +394,24 @@ def overlay_single_layered_cam_large_image(model, cnn_trained_image_size, classe
     # class index of interest
     class_idx = classes.index(class_name)
 
-    return get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, classes, image, conv_name,
-                                                      overlay_alpha=overlay_alpha,
-                                                      class_idx=class_idx, show_top_x_classes=None,
-                                                      overlay_predictions=overlay_predictions,
-                                                      overlay_text_color=overlay_text_color)
+    heatmap, raw_pred = get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, len(classes), image,
+                                                                   conv_name,
+                                                                   overlay_alpha=overlay_alpha,
+                                                                   class_idx=class_idx, show_top_x_classes=None)
+
+    # make readable before return
+    return heatmap, englishify_pred(raw_pred, classes, is_multi=False)
 
 
 def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes, image, conv_name, overlay_alpha=0.5,
-                                          show_top_x_classes=3, overlay_predictions=False,
-                                          overlay_text_color=(0, 0, 0)):
+                                          show_top_x_classes=3):
     '''
-    Takes in a larger image than what the CNN model was trained on and returns a multi-CAM overlay. If image dimensions
-    are not multiples of the CNN's trained image size, rightmost and/or bottommost parts of the image are ignored.
-    Returns total average prediction if 'overlay_predictions' is False. Otherwise, shows individual sub-image predictions
-    as overlay
+    Takes in an image of any size (>= cnn_trained_image_size) and returns a heatmap overlay of multiple classes.
+    Rightmost and/or bottommost parts of the image are ignored if image dimensions are not
+    multiples of the CNN's trained image size. Additionally returns a predicted percent breakdown
+    of each class' presence within the image
 
-    Each overlay on each subimage will have at most its top 5 predicted classes shown.
-    Currently supports as many classes as colormap values (7)
-
-    Class activation map is an unsupervised way of doing object localization with accuracy near par with supervised methods
+    N.B. Currently supports as many classes as colormap values
 
     Parameters
     -----------
@@ -536,31 +432,28 @@ def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes
     overlay_alpha : float, optional, default: 0.5, values: [0,1]
         Transparency of the cam overlay on top of the original image
 
-    show_top_x_classes: int, optional, default: None, values: [0,5]
+    show_top_x_classes: int, optional, default: 3
         Overlays cam's of x classes that have the highest probabilities
-
-    overlay_predictions : bool, optional, default: False
-        Overlay prediction of each sub-image
-
-    overlay_text_color : tuple of int
-        RGB color of the overlay prediction text. Ignored if 'overlay_predictions' is False
 
     Returns
     --------
     new_image : array_like
-    my_dict : dict
+    pred : str
     '''
 
-    if not (0 <= show_top_x_classes <= 5):
-        raise Exception("Can only show between 0 and 5 classes")
+    if len(classes) > len(COLORMAPS):
+        raise Exception("Only {} classes are currently supported".format(str(len(COLORMAPS))))
 
     # check if we have less classes than the number of classes desired to show
     if len(classes) < show_top_x_classes:
         # show all the classes
         show_top_x_classes = len(classes)
 
-    return get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, classes, image, conv_name,
-                                                      overlay_alpha=overlay_alpha,
-                                                      class_idx=None, show_top_x_classes=show_top_x_classes,
-                                                      overlay_predictions=overlay_predictions,
-                                                      overlay_text_color=overlay_text_color)
+    heatmap, raw_pred = get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, len(classes), image,
+                                                                   conv_name,
+                                                                   overlay_alpha=overlay_alpha,
+                                                                   class_idx=None,
+                                                                   show_top_x_classes=show_top_x_classes)
+
+    # make readable before return
+    return heatmap, englishify_pred(raw_pred, classes, is_multi=True)
