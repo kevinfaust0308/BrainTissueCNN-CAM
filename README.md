@@ -9,6 +9,10 @@ Notes
 2. If image dimensions are not multiples of the CNN's trained image size, rightmost and/or bottommost parts of the image are ignored
 3. multi-layered CAM currently works with **up to 6 classes**
 
+## Demo
+
+https://github.com/kevinfaust0308/ImageHeatmapGeneratorDemo
+
 ## Getting Started
 
 1. overlay_single_layered_cam_large_image
