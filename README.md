@@ -40,11 +40,11 @@ opencv
 
 ##### 1. Areas that contain gray matter brain tissue
 
-![Alt text](images/single_class_heatmap_GRAYMATTER.jpg?raw=true "Single CAM Overlay")
+<img src="images/single_class_heatmap_GRAYMATTER.jpg" width="350">
 
 ##### 2. Areas that contain white matter brain tissue
 
-![Alt text](images/single_class_heatmap_WHITEMATTER.jpg?raw=true "Single CAM Overlay")
+<img src="images/single_class_heatmap_WHITEMATTER.jpg" width="350">
 
 #### Multi Layer 
 
@@ -52,9 +52,7 @@ opencv
 
 ###### | Blank --> Blue | Gray Mat. --> Gray | Lesion --> Red | White Mat. --> White |
 
-##### Full
-
-![Alt text](images/HEATMAP_FULL.jpg?raw=true "Multi CAM Overlay")
+<img src="images/HEATMAP_FULL.jpg" width="550">
 
 ## License
 
