@@ -342,7 +342,7 @@ def englishify_pred(pred, classes, is_multi):
 
     # loop through each class and combine class with pred
     for i in range(len(classes)):
-        result += '{}: {:.2f}%'.format(classes[i], pred[i])
+        result += '{}: {:.2f}%'.format(classes[i], pred[i] * 100)
 
         # if multi-layer, add colormap color
         if is_multi:
@@ -395,8 +395,8 @@ def overlay_single_layered_cam_large_image(model, cnn_trained_image_size, classe
     return heatmap, englishify_pred(raw_pred, classes, is_multi=False)
 
 
-def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes, image, conv_name, overlay_alpha=0.5,
-                                          show_top_x_classes=3):
+def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes, image, conv_name,
+                                          show_top_x_classes=3, overlay_alpha=0.5):
     '''
     Takes in an image of any size (>= cnn_trained_image_size) and returns a heatmap overlay of multiple classes.
     Rightmost and/or bottommost parts of the image are ignored if image dimensions are not

@@ -50,11 +50,11 @@ opencv
 
 ##### Areas of multiple classes
 
-###### | Blank --> Blue | Gray Mat. --> Green | Lesion --> Red | White Mat. --> Purple |
+###### | Blank --> Blue | Gray Mat. --> Gray | Lesion --> Red | White Mat. --> White |
 
 ##### Full
 
-![Alt text](images/HEATMAP_FULL.png?raw=true "Multi CAM Overlay")
+![Alt text](images/HEATMAP_FULL.jpg?raw=true "Multi CAM Overlay")
 
 ## License
 
