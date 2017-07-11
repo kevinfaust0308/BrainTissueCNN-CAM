@@ -6,24 +6,31 @@ from heatmap_generator import overlay_multi_layered_cam_large_image, overlay_sin
 
 ##################################################### CONFIGS #########################################################
 
+# file io
 INPUT_IMAGE_PATH = 'input.jpg'
 OUTPUT_IMAGE_PATH = 'output_heatmap.jpg'
 
-trained_img_size = 512  # size of each tile (size our cnn was trained on)
-conv_block = 'block5_pool'  # name of the final convolutional layer (for vgg) (can view layers using model.summary())
-classes = ['Blank', 'Gray Mat.', 'Lesion', 'White Mat.']  # classes model was trained on. ordering matters
-a = 0.3  # heatmap transparency
+# model settings
+MODEL_PATH = 'VGG19_256.h5'
+TRAINED_IMG_SIZE = 256  # size of each tile (size our cnn was trained on)
+CONV_BLOCK = 'block5_pool'  # name of the final convolutional layer (for vgg) (can view layers using model.summary())
+CLASSES = ['Blank', 'Gray Mat.', 'Lesion', 'White Mat.']  # classes model was trained on. ordering matters
+
+# design
+OVERLAY_PRED = True  # get heatmap with predictions written over each tile
+OVERLAY_TEXT_COLOR = (0, 255, 80)  # overlay text color
+ALPHA = 0.3  # heatmap transparency
 
 # single layer configs
-heatmap_class = 'Gray Mat.'  # get heatmap of specified class
+HEATPMAP_CLASS = 'Gray Mat.'  # get heatmap of specified class
 
 # multi layer configs
-show_top_x_classes = len(classes)  # show colors of all classes
+SHOW_TOP_X_CLASSES = len(CLASSES)  # show colors of all classes
 
 ################################################# END OF CONFIGS ######################################################
 
 # load model
-model = load_model('VGG19_trained.h5')
+model = load_model(MODEL_PATH)
 
 
 def generate_heatmap(img_path, save_path, multi=True):
@@ -31,11 +38,15 @@ def generate_heatmap(img_path, save_path, multi=True):
     im = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
 
     if multi:
-        cam, avg_pred = overlay_multi_layered_cam_large_image(model, trained_img_size, classes, im, conv_block,
-                                                              show_top_x_classes=show_top_x_classes, overlay_alpha=a)
+        cam, avg_pred = overlay_multi_layered_cam_large_image(model, TRAINED_IMG_SIZE, CLASSES, im, CONV_BLOCK,
+                                                              show_top_x_classes=SHOW_TOP_X_CLASSES,
+                                                              overlay_alpha=ALPHA, overlay_predictions=OVERLAY_PRED,
+                                                              overlay_text_color=OVERLAY_TEXT_COLOR)
     else:
-        cam, avg_pred = overlay_single_layered_cam_large_image(model, trained_img_size, classes, im, conv_block,
-                                                               class_name=heatmap_class, overlay_alpha=a)
+        cam, avg_pred = overlay_single_layered_cam_large_image(model, TRAINED_IMG_SIZE, CLASSES, im, CONV_BLOCK,
+                                                               class_name=HEATPMAP_CLASS, overlay_alpha=ALPHA,
+                                                               overlay_predictions=OVERLAY_PRED,
+                                                               overlay_text_color=OVERLAY_TEXT_COLOR)
 
     # save heatmap generated
     cv2.imwrite(save_path, cv2.cvtColor(cam, cv2.COLOR_RGB2BGR))

@@ -263,7 +263,8 @@ def get_multi_layered_cam(model, image, conv_layer, overlay_alpha, show_top_x_cl
 
 def get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, num_classes, image, conv_name,
                                                overlay_alpha,
-                                               show_top_x_classes, class_idx):
+                                               show_top_x_classes, class_idx, overlay_predictions,
+                                               overlay_text_color, classes):
     # check for invalid params
     if not (0 <= overlay_alpha <= 1):
         raise Exception("Invalid overlay_alpha given")
@@ -320,6 +321,10 @@ def get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, nu
                                                            overlay_alpha=overlay_alpha,
                                                            class_idx=class_idx)
 
+            # show on subimage the class and predictions
+            if overlay_predictions:
+                overlay_prediction_on_image(overlay_cam, pred, classes, overlay_text_color)
+
             tot_pred += pred
             counter += 1
 
@@ -352,8 +357,38 @@ def englishify_pred(pred, classes, is_multi):
     return result
 
 
+def overlay_prediction_on_image(image, pred, classes, text_color):
+    '''
+    Takes a heatmap overlayed image and writes predictions over it inplace
+    Parameters
+    '''
+
+    # starting top offset
+    top_offset = 30
+
+    # loop through all classes
+    for i in range(len(classes)):
+        p = '{:.2f}'.format(pred[i] * 100) # get pred and make 2 decimals
+        text = '{}: {}%'.format(classes[i], p)
+
+        cv2.putText(
+            image,  # put text on this image
+            text,  # text
+            (10, top_offset),  # left offset, top offset
+            cv2.FONT_HERSHEY_SIMPLEX,  # font family
+            0.6,  # scale of text size
+            text_color,  # color
+            1,  # line width
+            cv2.LINE_AA  # line type
+        )
+
+        # move next text down for spacing
+        top_offset += 30
+
+
 def overlay_single_layered_cam_large_image(model, cnn_trained_image_size, classes, image, conv_name, class_name,
-                                           overlay_alpha=0.5):
+                                           overlay_alpha=0.5, overlay_predictions=False,
+                                           overlay_text_color=(0, 255, 80)):
     '''
     Takes in an image of any size (>= cnn_trained_image_size) and returns a heatmap overlay based on the chosen class.
     Rightmost and/or bottommost parts of the image are ignored if image dimensions are not
@@ -362,18 +397,22 @@ def overlay_single_layered_cam_large_image(model, cnn_trained_image_size, classe
     Parameters
     -----------
     model : '~keras.models'
-        Model to generate prediction and CAM off of
+        Model to generate prediction and heatmap off of
     cnn_trained_image_size: int
         Image size trained on the CNN
     classes: list of str
     image : ndarray
         Matrix representation. Must have dimensions that are multiples of 'cnn_trained_image_size'
     conv_name : str
-        Name of the convolutional layer which we will generate the CAM
+        Name of the convolutional layer which we will generate the heatmap
     class_name: str
         Name of class to generate cam on
     overlay_alpha : float, optional, default: 0.5, values: [0,1]
         Transparency of the cam overlay on top of the original image
+    overlay_predictions : bool, optional, default: False
+        Overlay prediction of each sub-image
+    overlay_text_color : tuple of int
+        RGB color of the overlay prediction text. Ignored if 'overlay_predictions' is False
     Returns
     --------
     new_image : array_like
@@ -389,14 +428,17 @@ def overlay_single_layered_cam_large_image(model, cnn_trained_image_size, classe
     heatmap, raw_pred = get_final_cam_overlay_and_pred_large_image(model, cnn_trained_image_size, len(classes), image,
                                                                    conv_name,
                                                                    overlay_alpha=overlay_alpha,
-                                                                   class_idx=class_idx, show_top_x_classes=None)
+                                                                   class_idx=class_idx, show_top_x_classes=None,
+                                                                   overlay_predictions=overlay_predictions,
+                                                                   overlay_text_color=overlay_text_color, classes=classes)
 
     # make readable before return
     return heatmap, englishify_pred(raw_pred, classes, is_multi=False)
 
 
 def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes, image, conv_name,
-                                          show_top_x_classes=3, overlay_alpha=0.5):
+                                          show_top_x_classes=3, overlay_alpha=0.5, overlay_predictions=False,
+                                          overlay_text_color=(0, 255, 80)):
     '''
     Takes in an image of any size (>= cnn_trained_image_size) and returns a heatmap overlay of multiple classes.
     Rightmost and/or bottommost parts of the image are ignored if image dimensions are not
@@ -406,18 +448,22 @@ def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes
     Parameters
     -----------
     model : '~keras.models'
-        Model to generate prediction and CAM off of
+        Model to generate prediction and heatmap off of
     cnn_trained_image_size: int
         Image size trained on the CNN
     classes: list of str
     image : ndarray
         Matrix representation. Must have dimensions that are multiples of 'cnn_trained_image_size'
     conv_name : str
-        Name of the convolutional layer which we will generate the CAM
+        Name of the convolutional layer which we will generate the heatmap
+    show_top_x_classes: int, optional, default: 3
+        Overlays heatmaps of x classes that have the highest probabilities
     overlay_alpha : float, optional, default: 0.5, values: [0,1]
         Transparency of the cam overlay on top of the original image
-    show_top_x_classes: int, optional, default: 3
-        Overlays cam's of x classes that have the highest probabilities
+    overlay_predictions : bool, optional, default: False
+        Overlay prediction of each sub-image
+    overlay_text_color : tuple of int
+        RGB color of the overlay prediction text. Ignored if 'overlay_predictions' is False
     Returns
     --------
     new_image : array_like
@@ -436,7 +482,9 @@ def overlay_multi_layered_cam_large_image(model, cnn_trained_image_size, classes
                                                                    conv_name,
                                                                    overlay_alpha=overlay_alpha,
                                                                    class_idx=None,
-                                                                   show_top_x_classes=show_top_x_classes)
+                                                                   show_top_x_classes=show_top_x_classes,
+                                                                   overlay_predictions=overlay_predictions,
+                                                                   overlay_text_color=overlay_text_color, classes=classes)
 
     # make readable before return
     return heatmap, englishify_pred(raw_pred, classes, is_multi=True)
